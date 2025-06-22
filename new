@@ -1,0 +1,401 @@
+-- Services
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "ESPMenu"
+gui.ResetOnSpawn = false
+
+-- Main Frame
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 100, 0, 20)
+main.Position = UDim2.new(0, 20, 0, 100)
+main.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+main.BackgroundTransparency = 0.2
+main.BorderSizePixel = 0
+main.Active = true
+
+-- Menu Button
+local menuButton = Instance.new("TextButton", main)
+menuButton.Size = UDim2.new(1, 0, 1, 0)
+menuButton.Text = "Menu ▼"
+menuButton.BackgroundTransparency = 1
+menuButton.BorderSizePixel = 0
+menuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+menuButton.Font = Enum.Font.SourceSans
+menuButton.TextSize = 16
+menuButton.TextXAlignment = Enum.TextXAlignment.Center
+menuButton.TextYAlignment = Enum.TextYAlignment.Center
+menuButton.AutoButtonColor = true
+
+-- Drop Frame
+local dropFrame = Instance.new("Frame", main)
+dropFrame.Size = UDim2.new(1, 0, 0, 0)
+dropFrame.Position = UDim2.new(0, 0, 1, 0)
+dropFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+dropFrame.BackgroundTransparency = 0.2
+dropFrame.BorderSizePixel = 0
+dropFrame.Visible = false
+dropFrame.ClipsDescendants = true
+
+-- Dropdown Button Creator
+local function createDropButton(text, callback)
+	local btn = Instance.new("TextButton", dropFrame)
+	btn.Size = UDim2.new(1, 0, 0, 24)
+	btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+	btn.BackgroundTransparency = 0.2
+	btn.BorderSizePixel = 0
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.SourceSans
+	btn.TextSize = 14
+	btn.MouseButton1Click:Connect(callback)
+	return btn
+end
+-- Drag Setup
+local dragging = false
+local dragStart, startPos
+local movedEnoughToDrag = false
+
+menuButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		movedEnoughToDrag = false
+		dragStart = input.Position
+		startPos = main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+				if not movedEnoughToDrag then
+					dropFrame.Visible = not dropFrame.Visible
+				end
+			end
+		end)
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		if delta.Magnitude > 4 then
+			movedEnoughToDrag = true
+		end
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- Toggle Dropdown Only (not whole UI)
+UIS.InputBegan:Connect(function(input, gpe)
+	if input.KeyCode == Enum.KeyCode.K and not gpe then
+		dropFrame.Visible = not dropFrame.Visible
+	end
+end)
+
+-- Globals
+local autoflingRunning = false
+local boxEspEnabled = false
+local usernameLabels = {}
+local options = {}
+options = {
+	{"Walkfling", function()
+		local nan = 340282356779733642739999999999999999999
+		local movel = 0.1
+		local Vector3_new = Vector3.new
+		local Vector3_nan = Vector3_new(nan, nan, nan)
+
+		local Part = player.Character.HumanoidRootPart
+		local RenderStepped = RunService.RenderStepped
+		local Heartbeat = RunService.Heartbeat
+		local Stepped = RunService.Stepped
+		local Wait = RenderStepped.Wait
+		local originalvelocity = nil
+		local connection = nil
+
+		connection = Heartbeat:Connect(function()
+			originalvelocity = Part.Velocity
+			Part.Velocity = originalvelocity * 10000 + Vector3_nan
+			Wait(RenderStepped)
+			Part.Velocity = originalvelocity
+			Wait(Stepped)
+			Part.Velocity = originalvelocity + Vector3_new(0, movel, 0)
+			movel *= -1
+		end)
+
+		player.CharacterAdded:Once(function()
+			if connection then connection:Disconnect() end
+		end)
+	end},
+
+	{"Animation", function()
+		if _G.zombieAnim then _G.zombieAnim:Disconnect() end
+		_G.zombieAnim = RunService.Stepped:Connect(function()
+			local char = player.Character
+			if char and char:FindFirstChild("Animate") then
+				local anim = char.Animate
+				anim.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=10921344533"
+				anim.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=10921345304"
+				anim.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+				anim.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=10921351278"
+				anim.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=10921350320"
+				anim.climb.ClimbAnim.AnimationId = "http://www.roblox.com/asset/?id=10921343576"
+			end
+		end)
+	end},
+
+	{"Fly", function()
+		_G.flying = not _G.flying
+		if _G.flying and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			local cam = workspace.CurrentCamera
+			_G.flyConn = RunService.RenderStepped:Connect(function()
+				local move = Vector3.zero
+				if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+				if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+				if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+				if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+				if UIS:IsKeyDown(Enum.KeyCode.Space) then move += cam.CFrame.UpVector end
+				if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then move -= cam.CFrame.UpVector end
+				if move.Magnitude > 0 then
+					hrp.Velocity = Vector3.zero
+					hrp.CFrame = hrp.CFrame + move.Unit * 2
+				end
+			end)
+		elseif _G.flyConn then
+			_G.flyConn:Disconnect()
+			_G.flyConn = nil
+		end
+	end},
+
+	{"Noclip", function()
+		_G.noclipping = not _G.noclipping
+		if _G.noclipping then
+			_G.noclipConn = RunService.Stepped:Connect(function()
+				local char = player.Character
+				if char then
+					for _, p in ipairs(char:GetDescendants()) do
+						if p:IsA("BasePart") then p.CanCollide = false end
+					end
+				end
+			end)
+		elseif _G.noclipConn then
+			_G.noclipConn:Disconnect()
+			_G.noclipConn = nil
+			local char = player.Character
+			if char then
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") then p.CanCollide = true end
+				end
+			end
+		end
+	end},
+
+	{"Auto Fling", function()
+		autoflingRunning = not autoflingRunning
+		if autoflingRunning then
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostPlayer352/Test4/main/Auto%20Fling%20Player"))()
+		else
+			player.Character:BreakJoints()
+		end
+	end},
+
+	{"Invisible", function()
+		loadstring(game:HttpGet("https://pastebin.com/raw/3Rnd9rHf"))()
+	end},
+
+	{"ESP", function()
+		boxEspEnabled = not boxEspEnabled
+		if boxEspEnabled then
+			for _, p in ipairs(Players:GetPlayers()) do
+				if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+					local adorn = Instance.new("BoxHandleAdornment", p.Character.HumanoidRootPart)
+					adorn.Size = Vector3.new(4, 6, 2)
+					adorn.Color3 = Color3.new(1, 1, 1)
+					adorn.Transparency = 0.4
+					adorn.ZIndex = 5
+					adorn.Adornee = p.Character.HumanoidRootPart
+					adorn.AlwaysOnTop = true
+				end
+			end
+		else
+			for _, p in ipairs(Players:GetPlayers()) do
+				if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+					for _, v in ipairs(p.Character.HumanoidRootPart:GetChildren()) do
+						if v:IsA("BoxHandleAdornment") then v:Destroy() end
+					end
+				end
+			end
+		end
+	end},
+
+	{"Infinite Yield", function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+	end},
+
+	{"VC Unban", function()
+		pcall(function()
+			game:GetService("VoiceChatService"):JoinVoice()
+		end)
+	end},
+}
+-- Spectate popup
+local function createSpectatePopup()
+	local popup = Instance.new("Frame", gui)
+	popup.Size = UDim2.new(0, 200, 0, 100)
+	popup.Position = UDim2.new(0.5, -100, 0.5, -50)
+	popup.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	popup.BackgroundTransparency = 0.2
+	popup.BorderSizePixel = 0
+	popup.Visible = true
+
+	local input = Instance.new("TextBox", popup)
+	input.Size = UDim2.new(1, -10, 0, 30)
+	input.Position = UDim2.new(0, 5, 0, 10)
+	input.PlaceholderText = "Username or DisplayName"
+	input.Text = ""
+	input.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	input.TextColor3 = Color3.new(1, 1, 1)
+
+	local goBtn = Instance.new("TextButton", popup)
+	goBtn.Size = UDim2.new(1, -10, 0, 30)
+	goBtn.Position = UDim2.new(0, 5, 0, 50)
+	goBtn.Text = "Spectate"
+	goBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+	goBtn.TextColor3 = Color3.new(1, 1, 1)
+
+	local close = Instance.new("TextButton", popup)
+	close.Text = "X"
+	close.Size = UDim2.new(0, 24, 0, 24)
+	close.Position = UDim2.new(1, -24, 0, 0)
+	close.BackgroundTransparency = 1
+	close.TextColor3 = Color3.new(1, 1, 1)
+	close.Font = Enum.Font.SourceSansBold
+	close.TextSize = 18
+
+	close.MouseButton1Click:Connect(function()
+		popup:Destroy()
+	end)
+
+	goBtn.MouseButton1Click:Connect(function()
+		local name = input.Text:lower()
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr.Name:lower():find(name) or plr.DisplayName:lower():find(name) then
+				workspace.CurrentCamera.CameraSubject = plr.Character and plr.Character:FindFirstChildWhichIsA("Humanoid") or plr.Character
+			end
+		end
+	end)
+end
+
+-- Teleport popup
+local function createTeleportPopup()
+	local popup = Instance.new("Frame", gui)
+	popup.Size = UDim2.new(0, 200, 0, 100)
+	popup.Position = UDim2.new(0.5, -100, 0.5, -50)
+	popup.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	popup.BackgroundTransparency = 0.2
+	popup.BorderSizePixel = 0
+	popup.Visible = true
+
+	local input = Instance.new("TextBox", popup)
+	input.Size = UDim2.new(1, -10, 0, 30)
+	input.Position = UDim2.new(0, 5, 0, 10)
+	input.PlaceholderText = "Username or DisplayName"
+	input.Text = ""
+	input.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	input.TextColor3 = Color3.new(1, 1, 1)
+
+	local goBtn = Instance.new("TextButton", popup)
+	goBtn.Size = UDim2.new(1, -10, 0, 30)
+	goBtn.Position = UDim2.new(0, 5, 0, 50)
+	goBtn.Text = "Teleport"
+	goBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+	goBtn.TextColor3 = Color3.new(1, 1, 1)
+
+	local close = Instance.new("TextButton", popup)
+	close.Text = "X"
+	close.Size = UDim2.new(0, 24, 0, 24)
+	close.Position = UDim2.new(1, -24, 0, 0)
+	close.BackgroundTransparency = 1
+	close.TextColor3 = Color3.new(1, 1, 1)
+	close.Font = Enum.Font.SourceSansBold
+	close.TextSize = 18
+
+	close.MouseButton1Click:Connect(function()
+		popup:Destroy()
+	end)
+
+	goBtn.MouseButton1Click:Connect(function()
+		local name = input.Text:lower()
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr.Name:lower():find(name) or plr.DisplayName:lower():find(name) then
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					player.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+				end
+			end
+		end
+	end)
+end
+
+-- Username Labels with @ format
+local function toggleUsernameLabels()
+	local enabled = not next(usernameLabels)
+	if enabled then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr.Character and plr.Character:FindFirstChild("Head") then
+				local head = plr.Character.Head
+				local label = Instance.new("BillboardGui", head)
+				label.Size = UDim2.new(0, 200, 0, 50)
+				label.StudsOffset = Vector3.new(0, 2.5, 0)
+				label.AlwaysOnTop = true
+
+				local text = Instance.new("TextLabel", label)
+				text.Size = UDim2.new(1, 0, 1, 0)
+				text.BackgroundTransparency = 1
+				text.TextColor3 = Color3.new(1, 1, 1)
+				text.TextStrokeTransparency = 0.5
+				text.TextStrokeColor3 = Color3.new(0, 0, 0)
+				text.Font = Enum.Font.Gotham
+				text.TextSize = 15
+				text.Text = plr.DisplayName .. " | @" .. plr.Name
+				usernameLabels[plr] = label
+			end
+		end
+	else
+		for _, label in pairs(usernameLabels) do
+			label:Destroy()
+		end
+		usernameLabels = {}
+	end
+end
+
+-- Ctrl + Click Teleport
+UIS.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+		local mouse = player:GetMouse()
+		local target = mouse.Hit
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			player.Character.HumanoidRootPart.CFrame = target + Vector3.new(0, 3, 0)
+		end
+	end
+end)
+
+-- Add extended features
+table.insert(options, {"Spectate", createSpectatePopup})
+table.insert(options, {"Username", toggleUsernameLabels})
+table.insert(options, {"TP to Player", createTeleportPopup})
+table.insert(options, {"Click TP", function() end}) -- already bound above
+
+-- Build dropdown buttons
+for i, item in ipairs(options) do
+	local btn = createDropButton(item[1], item[2])
+	btn.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
+end
+dropFrame.Size = UDim2.new(1, 0, 0, #options * 24)
