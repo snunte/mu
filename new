@@ -93,7 +93,7 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
--- Toggle Dropdown Only (not whole UI)
+-- Toggle Dropdown Only (K key)
 UIS.InputBegan:Connect(function(input, gpe)
 	if input.KeyCode == Enum.KeyCode.K and not gpe then
 		dropFrame.Visible = not dropFrame.Visible
@@ -197,7 +197,6 @@ options = {
 			end
 		end
 	end},
-
 	{"Auto Fling", function()
 		autoflingRunning = not autoflingRunning
 		if autoflingRunning then
@@ -244,6 +243,18 @@ options = {
 		pcall(function()
 			game:GetService("VoiceChatService"):JoinVoice()
 		end)
+	end},
+
+	{"TP Walk", function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/snunte/tp/refs/heads/main/walk"))()
+	end},
+
+	{"Rejoin", function()
+		game:GetService("TeleportService"):Teleport(game.PlaceId, player)
+	end},
+
+	{"Freecam", function()
+		loadstring(game:HttpGet("https://github.com/snunte/shitfreecam/raw/main/main.lua"))()
 	end},
 }
 -- Spectate popup
@@ -375,7 +386,6 @@ local function toggleUsernameLabels()
 		usernameLabels = {}
 	end
 end
-
 -- Ctrl + Click Teleport
 UIS.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
@@ -387,15 +397,31 @@ UIS.InputBegan:Connect(function(input)
 	end
 end)
 
--- Add extended features
+-- Add extended features to dropdown
 table.insert(options, {"Spectate", createSpectatePopup})
 table.insert(options, {"Username", toggleUsernameLabels})
 table.insert(options, {"TP to Player", createTeleportPopup})
 table.insert(options, {"Click TP", function() end}) -- already bound above
+
+-- TP Walk tab
+table.insert(options, {"TP Walk", function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/snunte/tp/refs/heads/main/walk"))()
+end})
+
+-- Rejoin tab
+table.insert(options, {"Rejoin", function()
+	game:GetService("TeleportService"):Teleport(game.PlaceId, Players.LocalPlayer)
+end})
+
+-- Freecam tab
+table.insert(options, {"Freecam", function()
+	loadstring(game:HttpGet("https://github.com/snunte/shitfreecam"))()
+end})
 
 -- Build dropdown buttons
 for i, item in ipairs(options) do
 	local btn = createDropButton(item[1], item[2])
 	btn.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
 end
+
 dropFrame.Size = UDim2.new(1, 0, 0, #options * 24)
